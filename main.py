@@ -36,6 +36,8 @@ def load_data():
         df["해당일관객수"] = pd.to_numeric(df["해당일관객수"], errors="coerce")
     if "누적관객수" in df.columns:
         df["누적관객수"] = pd.to_numeric(df["누적관객수"], errors="coerce")
+    if "순위" in df.columns:
+        df["순위"] = pd.to_numeric(df["순위"], errors="coerce")
     
     # 5. 전체 데이터를 기준일자 순서대로 정렬
     df = df.sort_values("기준일자")
@@ -134,22 +136,44 @@ else:
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 7. 메인 화면 - 구역 3: 누적 관객수 TOP 5 영화 비교 (다중 선 그래프)
+# 7. 메인 화면 - 구역 3: 장기 흥행(20일 이상 TOP 10) 영화 중 누적 관객수 TOP 5 비교
 # -----------------------------------------------------------------------------
-st.header("🏆 3. 누적 관객수 TOP 5 영화 추이 비교")
+st.header("🏆 3. 장기 흥행(TOP 10 20일 이상) TOP 5 영화 추이 비교")
 
-# 누적 관객수가 가장 높은 상위 5개 영화 추출
-top5_movies = movie_order[:5]
-top5_df = data[data["영화명"].isin(top5_movies)]
+# 1) TOP 10 진입 데이터 추출 (순위 컬럼이 있으면 10위 이내 필터링)
+if "순위" in data.columns:
+    top10_data = data[data["순위"] <= 10]
+else:
+    top10_data = data
 
-if not top5_df.empty:
-    # color="영화명" 옵션을 통해 영화별로 색상 구분 및 범례(Legend) 자동 생성
+# 2) 영화별 TOP 10 등재 일수 계산
+movie_days_count = top10_data.groupby("영화명")["기준일자"].nunique()
+
+# 3) TOP 10 등재 일수가 20일 이상인 영화만 필터링
+movies_over_20days = movie_days_count[movie_days_count >= 20].index
+
+# 4) 조건(20일 이상)을 만족하는 영화 중 최대 누적 관객수 기준 상위 5개 선정
+top5_long_running_movies = (
+    data[data["영화명"].isin(movies_over_20days)]
+    .groupby("영화명")["누적관객수"]
+    .max()
+    .sort_values(ascending=False)
+    .head(5)
+    .index
+    .tolist()
+)
+
+# 5) 선정된 5개 영화의 전체 데이터 추출
+top5_long_df = data[data["영화명"].isin(top5_long_running_movies)]
+
+if not top5_long_df.empty:
+    # color="영화명"을 지정해 영화별 개별 색상 및 범례 생성
     fig3 = px.line(
-        top5_df,
+        top5_long_df,
         x="기준일자",
         y="누적관객수",
         color="영화명",
-        title="상위 5개 영화의 누적 관객수 성장 추이 비교",
+        title="TOP 10에 20일 이상 등장한 영화 중 누적 관객수 TOP 5 성장 추이",
         labels={"기준일자": "날짜", "누적관객수": "누적 관객수 (명)", "영화명": "영화 제목"},
         markers=True,
         hover_data={"기준일자": "|%Y-%m-%d", "누적관객수": ":,d"}
@@ -166,8 +190,8 @@ if not top5_df.empty:
     
     st.info(
         "💡 **이 그래프로 알 수 있는 것:** "
-        "가장 흥행한 상위 5개 영화의 누적 관객 증가 속도와 최종 흥행 규모를 서로 비교할 수 있으며, "
-        "어떤 영화가 가장 빠른 페이스로 관객수를 모았는지 직관적으로 확인해 볼 수 있습니다."
+        "일시적인 깜짝 흥행에 그치지 않고 최소 20일 이상 TOP 10 상위권을 지킨 '장기 흥행작' 중 "
+        "최종 누적 관객수가 가장 높았던 상위 5개 영화의 날짜별 관객 누적 속도를 비교할 수 있습니다."
     )
 else:
-    st.warning("상위 영화 데이터를 불러올 수 없습니다.")
+    st.warning("조건을 만족하는 영화 데이터가 존재하지 않습니다.")
