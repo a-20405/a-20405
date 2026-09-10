@@ -221,7 +221,6 @@ daily_sum_df = (
 daily_sum_df["7일이동평균"] = daily_sum_df["해당일관객수"].rolling(window=7, min_periods=1).mean()
 
 if not daily_sum_df.empty:
-    # Plotly Graph Objects를 활용하여 원본선(연하게)과 이동평균선(진하게) 생성
     fig4 = go.Figure()
 
     # 원본 일별 관객수 합계 (연한 색상)
@@ -262,6 +261,52 @@ if not daily_sum_df.empty:
         "💡 **이 그래프로 알 수 있는 것:** "
         "주말과 평일 간의 관객수 변동(요일 효과)으로 인한 노이즈를 7일 이동평균선으로 완화하여, "
         "전체 영화 시장 관객 규모의 실제 성수기·비수기 흐름과 장기적인 트렌드를 명확하게 파악할 수 있습니다."
+    )
+else:
+    st.warning("분석할 박스오피스 데이터가 존재하지 않습니다.")
+
+st.markdown("---")
+
+# -----------------------------------------------------------------------------
+# 9. 메인 화면 - 구역 5: 월별 전체 관객수 합계 (막대그래프)
+# -----------------------------------------------------------------------------
+st.header("📊 5. 월별 전체 관객수 합계")
+
+if not daily_sum_df.empty:
+    # 1) 기준일자를 'YYYY-MM' 형식의 문자열 컬럼으로 생성
+    daily_sum_df["연월"] = daily_sum_df["기준일자"].dt.strftime("%Y-%m")
+
+    # 2) 월(연월) 단위로 재그룹화하여 해당일관객수 총합 계산
+    monthly_sum_df = (
+        daily_sum_df.groupby("연월")["해당일관객수"]
+        .sum()
+        .reset_index()
+        .sort_values("연월")
+    )
+
+    # 3) Plotly 막대그래프 생성
+    fig5 = px.bar(
+        monthly_sum_df,
+        x="연월",
+        y="해당일관객수",
+        title="월별 박스오피스 전체 관객수 합계",
+        labels={"연월": "조회 월", "해당일관객수": "월별 총 관객수 (명)"},
+        text_auto=",.0f",  # 막대 상단에 천 단위 쉼표가 들어간 숫자 수치 표시
+        hover_data={"연월": True, "해당일관객수": ":,d"}
+    )
+
+    fig5.update_layout(
+        xaxis_title="월 (YYYY-MM)",
+        yaxis_title="월별 총 관객수 (명)",
+        xaxis=dict(type="category")  # 범주형 축 지정으로 연월 표시 간격을 균일하게 유지
+    )
+
+    st.plotly_chart(fig5, use_container_width=True)
+
+    st.info(
+        "💡 **이 그래프로 알 수 있는 것:** "
+        "월 단위 총 관객수 규모를 직관적으로 비교하여 여름/겨울 방학 및 연말연시 등의 영화 시장 성수기와 "
+        "비수기 간의 전체 관객 유입량 차이를 명확히 파악할 수 있습니다."
     )
 else:
     st.warning("분석할 박스오피스 데이터가 존재하지 않습니다.")
