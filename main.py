@@ -311,9 +311,9 @@ else:
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 10. 메인 화면 - 구역 6: 캘린더 히트맵 (주차 x 요일별 일관객수)
+# 10. 메인 화면 - 구역 6: 캘린더 히트맵 (요일 x 주차별 일관객수)
 # -----------------------------------------------------------------------------
-st.header("🗓️ 6. 일별 관객수 캘린더 히트맵")
+st.header("🗓️ 6. 일별 관객수 캘린더 히트맵 (x축: 요일, y축: 연도-주차)")
 
 if not daily_sum_df.empty:
     heatmap_df = daily_sum_df.copy()
@@ -327,33 +327,37 @@ if not daily_sum_df.empty:
     heatmap_df["연주차"] = heatmap_df["기준일자"].dt.strftime("%Y-W%W")
     heatmap_df["날짜_str"] = heatmap_df["기준일자"].dt.strftime("%Y-%m-%d")
 
-    # 3) 피벗 테이블 생성 (x: 연주차, y: 요일, z: 관객수 / customdata: YYYY-MM-DD)
-    pivot_val = heatmap_df.pivot(index="요일", columns="연주차", values="해당일관객수")
-    pivot_date = heatmap_df.pivot(index="요일", columns="연주차", values="날짜_str")
+    # 3) 피벗 테이블 생성 (x축: 요일, y축: 연주차)
+    pivot_val = heatmap_df.pivot(index="연주차", columns="요일", values="해당일관객수")
+    pivot_date = heatmap_df.pivot(index="연주차", columns="요일", values="날짜_str")
 
-    # 4) 화면상 y축 맨 위에 '월요일', 맨 아래에 '일요일'이 오도록 인덱스 순서 재정렬
-    # (Plotly Heatmap은 y축 첫 번째 요소를 맨 아래에 그리므로 역순 배치)
-    pivot_val = pivot_val.reindex(reversed(days_kr))
-    pivot_date = pivot_date.reindex(reversed(days_kr))
+    # 4) X축(요일)을 월요일~일요일 순서대로 정렬
+    pivot_val = pivot_val.reindex(columns=days_kr)
+    pivot_date = pivot_date.reindex(columns=days_kr)
 
-    # 5) Plotly 히트맵 생성
+    # 5) Y축(연주차)을 과거->최근 순서(위에서 아래로)로 배치하기 위해 인덱스 역순 정렬
+    # (Plotly Heatmap은 y축 첫 번째 요소[index 0]를 맨 아래에 배치하기 때문)
+    pivot_val = pivot_val.reindex(index=reversed(pivot_val.index))
+    pivot_date = pivot_date.reindex(index=reversed(pivot_date.index))
+
+    # 6) Plotly 히트맵 생성
     fig6 = go.Figure(
         data=go.Heatmap(
             z=pivot_val.values,
-            x=pivot_val.columns,
-            y=pivot_val.index,
+            x=pivot_val.columns,       # x축: 월, 화, 수, 목, 금, 토, 일
+            y=pivot_val.index,         # y축: 연도-주차
             customdata=pivot_date.values,
-            colorscale="YlOrRd",  # 관객수가 많을수록 붉고 진하게 표시
-            hovertemplate="<b>날짜: %{customdata}</b><br>요일: %{y}요일<br>관객수: %{z:,}명<extra></extra>",
+            colorscale="YlOrRd",       # 관객수가 많을수록 붉고 진하게 표시
+            hovertemplate="<b>날짜: %{customdata}</b><br>요일: %{x}요일<br>관객수: %{z:,}명<extra></extra>",
             xgap=2,
             ygap=2
         )
     )
 
     fig6.update_layout(
-        title="주차 및 요일별 박스오피스 일관객수 캘린더 히트맵",
-        xaxis_title="연도-주차",
-        yaxis_title="요일",
+        title="요일 및 주차별 박스오피스 일관객수 캘린더 히트맵",
+        xaxis_title="요일",
+        yaxis_title="연도-주차",
         xaxis=dict(type="category")
     )
 
@@ -361,8 +365,7 @@ if not daily_sum_df.empty:
 
     st.info(
         "💡 **이 그래프로 알 수 있는 것:** "
-        "주차별·요일별 관객수 분포를 캘린더 형태로 확인하여, 연중 어떤 주차의 주말/평일에 관객 집중도가 극대화되었는지 "
-        "시각적으로 한눈에 비교할 수 있습니다."
+        "X축을 요일(월~일), Y축을 주차별로 배치하여 주중/주말에 따른 관객수 격차와 연중 주차별 관객 변화 트렌드를 직관적으로 비교할 수 있습니다."
     )
 else:
     st.warning("분석할 박스오피스 데이터가 존재하지 않습니다.")
