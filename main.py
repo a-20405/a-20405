@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 
 # -----------------------------------------------------------------------------
 # 1. 페이지 기본 설정
@@ -140,7 +141,7 @@ st.markdown("---")
 # -----------------------------------------------------------------------------
 st.header("🏆 3. 장기 흥행(TOP 10 20일 이상) TOP 5 영화 추이 비교")
 
-# 1) TOP 10 진입 데이터 추출 (순위 컬럼이 있으면 10위 이내 필터링)
+# 1) TOP 10 진입 데이터 추출
 if "순위" in data.columns:
     top10_data = data[data["순위"] <= 10]
 else:
@@ -152,7 +153,7 @@ movie_days_count = top10_data.groupby("영화명")["기준일자"].nunique()
 # 3) TOP 10 등재 일수가 20일 이상인 영화만 필터링
 movies_over_20days = movie_days_count[movie_days_count >= 20].index
 
-# 4) 조건(20일 이상)을 만족하는 영화 중 최대 누적 관객수 기준 상위 5개 선정
+# 4) 조건을 만족하는 영화 중 최대 누적 관객수 기준 상위 5개 선정
 top5_long_running_movies = (
     data[data["영화명"].isin(movies_over_20days)]
     .groupby("영화명")["누적관객수"]
@@ -167,7 +168,6 @@ top5_long_running_movies = (
 top5_long_df = data[data["영화명"].isin(top5_long_running_movies)]
 
 if not top5_long_df.empty:
-    # color="영화명"을 지정해 영화별 개별 색상 및 범례 생성
     fig3 = px.line(
         top5_long_df,
         x="기준일자",
@@ -190,8 +190,78 @@ if not top5_long_df.empty:
     
     st.info(
         "💡 **이 그래프로 알 수 있는 것:** "
-        "일시적인 깜짝 흥행에 그치지 않고 최소 20일 이상 TOP 10 상위권을 지킨 '장기 흥행작' 중 "
+        "최소 20일 이상 TOP 10 상위권을 지킨 '장기 흥행작' 중 "
         "최종 누적 관객수가 가장 높았던 상위 5개 영화의 날짜별 관객 누적 속도를 비교할 수 있습니다."
     )
 else:
     st.warning("조건을 만족하는 영화 데이터가 존재하지 않습니다.")
+
+st.markdown("---")
+
+# -----------------------------------------------------------------------------
+# 8. 메인 화면 - 구역 4: 전체 박스오피스(TOP 10) 일별 관객수 총합 및 7일 이동평균
+# -----------------------------------------------------------------------------
+st.header("📉 4. 전체 박스오피스 관객수 추이 및 7일 이동평균")
+
+# 1) TOP 10 영화 대상 데이터 추출
+if "순위" in data.columns:
+    top10_daily = data[data["순위"] <= 10]
+else:
+    top10_daily = data
+
+# 2) 기준일자별 TOP 10 영화의 해당일관객수 총합계 구하기
+daily_sum_df = (
+    top10_daily.groupby("기준일자")["해당일관객수"]
+    .sum()
+    .reset_index()
+    .sort_values("기준일자")
+)
+
+# 3) 7일 이동평균(Rolling Mean) 계산
+daily_sum_df["7일이동평균"] = daily_sum_df["해당일관객수"].rolling(window=7, min_periods=1).mean()
+
+if not daily_sum_df.empty:
+    # Plotly Graph Objects를 활용하여 원본선(연하게)과 이동평균선(진하게) 생성
+    fig4 = go.Figure()
+
+    # 원본 일별 관객수 합계 (연한 색상)
+    fig4.add_trace(
+        go.Scatter(
+            x=daily_sum_df["기준일자"],
+            y=daily_sum_df["해당일관객수"],
+            mode="lines",
+            name="일별 관객수 합계 (원본)",
+            line=dict(color="rgba(180, 180, 180, 0.5)", width=1.5),
+            hovertemplate="날짜: %{x|%Y-%m-%d}<br>일별 관객수: %{y:,}명<extra></extra>"
+        )
+    )
+
+    # 7일 이동평균선 (진하고 두꺼운 색상)
+    fig4.add_trace(
+        go.Scatter(
+            x=daily_sum_df["기준일자"],
+            y=daily_sum_df["7일이동평균"],
+            mode="lines",
+            name="7일 이동평균",
+            line=dict(color="#1f77b4", width=3),
+            hovertemplate="날짜: %{x|%Y-%m-%d}<br>7일 이동평균: %{y:,.0f}명<extra></extra>"
+        )
+    )
+
+    fig4.update_layout(
+        title="일자별 TOP 10 영화 관객수 합계 및 7일 이동평균 추이",
+        xaxis_title="기준일자",
+        yaxis_title="관객수 (명)",
+        hovermode="x unified",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+
+    st.plotly_chart(fig4, use_container_width=True)
+
+    st.info(
+        "💡 **이 그래프로 알 수 있는 것:** "
+        "주말과 평일 간의 관객수 변동(요일 효과)으로 인한 노이즈를 7일 이동평균선으로 완화하여, "
+        "전체 영화 시장 관객 규모의 실제 성수기·비수기 흐름과 장기적인 트렌드를 명확하게 파악할 수 있습니다."
+    )
+else:
+    st.warning("분석할 박스오피스 데이터가 존재하지 않습니다.")
