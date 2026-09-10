@@ -107,7 +107,6 @@ st.markdown("---")
 st.header(f"📊 2. '{selected_movie}' 누적 관객수 추이")
 
 if not filtered_df.empty:
-    # Plotly 영역 차트(area) 생성
     fig2 = px.area(
         filtered_df,
         x="기준일자",
@@ -131,3 +130,44 @@ if not filtered_df.empty:
     )
 else:
     st.warning("선택한 영화의 데이터가 존재하지 않습니다.")
+
+st.markdown("---")
+
+# -----------------------------------------------------------------------------
+# 7. 메인 화면 - 구역 3: 누적 관객수 TOP 5 영화 비교 (다중 선 그래프)
+# -----------------------------------------------------------------------------
+st.header("🏆 3. 누적 관객수 TOP 5 영화 추이 비교")
+
+# 누적 관객수가 가장 높은 상위 5개 영화 추출
+top5_movies = movie_order[:5]
+top5_df = data[data["영화명"].isin(top5_movies)]
+
+if not top5_df.empty:
+    # color="영화명" 옵션을 통해 영화별로 색상 구분 및 범례(Legend) 자동 생성
+    fig3 = px.line(
+        top5_df,
+        x="기준일자",
+        y="누적관객수",
+        color="영화명",
+        title="상위 5개 영화의 누적 관객수 성장 추이 비교",
+        labels={"기준일자": "날짜", "누적관객수": "누적 관객수 (명)", "영화명": "영화 제목"},
+        markers=True,
+        hover_data={"기준일자": "|%Y-%m-%d", "누적관객수": ":,d"}
+    )
+    
+    fig3.update_layout(
+        xaxis_title="기준일자",
+        yaxis_title="누적 관객수 (명)",
+        hovermode="x unified",
+        legend_title_text="영화 제목"
+    )
+    
+    st.plotly_chart(fig3, use_container_width=True)
+    
+    st.info(
+        "💡 **이 그래프로 알 수 있는 것:** "
+        "가장 흥행한 상위 5개 영화의 누적 관객 증가 속도와 최종 흥행 규모를 서로 비교할 수 있으며, "
+        "어떤 영화가 가장 빠른 페이스로 관객수를 모았는지 직관적으로 확인해 볼 수 있습니다."
+    )
+else:
+    st.warning("상위 영화 데이터를 불러올 수 없습니다.")
