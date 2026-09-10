@@ -1,162 +1,122 @@
 import streamlit as st
-import requests
 import pandas as pd
-from datetime import datetime, timedelta, timezone
+import plotly.express as px
 
 # -----------------------------------------------------------------------------
-# 1. 기본 페이지 설정
+# 1. 페이지 기본 설정
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="어제 일간 박스오피스",
+    page_title="박스오피스 데이터 분석 앱",
     page_icon="🎬",
     layout="wide"
 )
 
-# -----------------------------------------------------------------------------
-# 2. 날짜 계산 (한국 시간 KST 기준 '어제')
-# -----------------------------------------------------------------------------
-# 스트림릿 클라우드 서버 시계(UTC)와 상관없이 한국 시간(UTC+9)을 지정합니다.
-kst = timezone(timedelta(hours=9))
-yesterday = datetime.now(kst) - timedelta(days=1)
-
-# API 요청에 쓸 YYYYMMDD 형태 문자열
-target_dt = yesterday.strftime("%Y%m%d")
-# 화면 타이틀에 보여줄 날짜
-formatted_date = yesterday.strftime("%Y년 %m월 %d일")
-
-st.title(f"🎬 어제({formatted_date}) 박스오피스")
-
-# -----------------------------------------------------------------------------
-# 3. KOBIS API 호출 함수 (1시간 캐싱 적용)
-# -----------------------------------------------------------------------------
-# @st.cache_data(ttl=3600): 같은 날짜 요청 시 1시간(3600초) 동안 API 재호출 없이 데이터를 재사용합니다.
-@st.cache_data(ttl=3600)
-def fetch_box_office(api_key, date_str):
-    url = "https://www.kobis.or.kr/kobisopenapi/webservice/rest/boxoffice/searchDailyBoxOfficeList.json"
-    params = {
-        "key": api_key,
-        "targetDt": date_str
-    }
-    try:
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
-        return response.json(), None
-    except Exception as e:
-        return None, str(e)
-
-# -----------------------------------------------------------------------------
-# 4. Secrets에서 인증키 검증
-# -----------------------------------------------------------------------------
-# 스트림릿 비밀 금고(Secrets)에서 KOBIS_KEY를 불러옵니다.
-api_key = st.secrets.get("KOBIS_KEY")
-
-if not api_key:
-    st.error("❌ API 인증키(KOBIS_KEY)를 찾을 수 없습니다.")
-    st.info("""
-    **확인해 주세요:**
-    1. Streamlit Cloud의 **App Settings > Secrets** 설정 메뉴로 이동합니다.
-    2. 아래 형식으로 인증키를 등록했는지 확인하세요.
-    ```toml
-    KOBIS_KEY = "발급받은_인증키_입력"
-    ```
-    """)
-    st.stop()
-
-# -----------------------------------------------------------------------------
-# 5. API 데이터 호출 및 예외/오류 처리
-# -----------------------------------------------------------------------------
-data, network_error = fetch_box_office(api_key, target_dt)
-
-# (1) 통신 실패 오류
-if network_error:
-    st.error("❌ API 요청 중 네트워크 오류가 발생했습니다.")
-    st.caption(f"상세 오류 내용: {network_error}")
-    st.info("""
-    **확인해 주세요:**
-    - KOBIS 서버 점검 중이거나 네트워크 접속 문제일 수 있습니다. 잠시 후 다시 시도해 주세요.
-    """)
-    st.stop()
-
-# (2) API 응답 내 faultInfo 오류 (잘못된 키, 일일 사용량 초과 등)
-if "faultInfo" in data:
-    fault = data["faultInfo"]
-    st.error("❌ KOBIS API 응답 오류가 발생했습니다.")
-    st.warning(f"메시지: {fault.get('message', '알 수 없는 오류')}")
-    st.info("""
-    **확인해 주세요:**
-    - Secrets에 등록된 `KOBIS_KEY` 값이 정확한지 확인해 주세요.
-    - 영화진흥위원회 개발자 센터에서 키 상태 및 사용량을 확인해 주세요.
-    """)
-    st.stop()
-
-# (3) 영화 목록 데이터 유무 확인
-boxoffice_result = data.get("boxOfficeResult", {})
-daily_list = boxoffice_result.get("dailyBoxOfficeList", [])
-
-if not daily_list:
-    st.warning("⚠️ 박스오피스 목록이 비어 있습니다.")
-    st.info("""
-    **확인해 주세요:**
-    - 아직 해당 날짜의 일간 데이터 집계가 완료되지 않았을 수 있습니다.
-    - KOBIS 서비스의 데이터 업데이트 일정을 확인해 주세요.
-    """)
-    st.stop()
-
-# -----------------------------------------------------------------------------
-# 6. 데이터 전처리 (문자열 -> 숫자 변환)
-# -----------------------------------------------------------------------------
-df = pd.DataFrame(daily_list)
-
-# 문자열로 들어오는 숫자 데이터 컬럼을 정수/실수형 숫자로 바꿔 줍니다.
-numeric_cols = ["rank", "audiCnt", "audiAcc", "scrnCnt"]
-for col in numeric_cols:
-    df[col] = pd.to_numeric(df[col], errors="coerce")
-
-# 순위(rank) 기준으로 정렬합니다.
-df = df.sort_values("rank")
-
-# -----------------------------------------------------------------------------
-# 7. 화면 UI 구성
-# -----------------------------------------------------------------------------
-
-# [지표 카드] 1위 영화 주요 데이터 3장
-top_movie = df.iloc[0]
-st.subheader(f"🥇 1위: {top_movie['movieNm']}")
-
-col1, col2, col3 = st.columns(3)
-col1.metric("어제 관객수", f"{top_movie['audiCnt']:,} 명")
-col2.metric("누적 관객수", f"{top_movie['audiAcc']:,} 명")
-col3.metric("스크린수", f"{top_movie['scrnCnt']:,} 개")
-
+st.title("🎬 1개년 박스오피스 데이터 분석")
+st.markdown("KOBIS 데이터를 바탕으로 영화별 관객수 추이 및 통계를 분석합니다.")
 st.markdown("---")
 
-# [막대그래프] 관객수 상위 5개 영화
-st.subheader("📊 관객수 상위 5개 영화")
-top_5_df = df.head(5).copy()
+# -----------------------------------------------------------------------------
+# 2. 데이터 불러오기 및 전처리 (캐싱 적용)
+# -----------------------------------------------------------------------------
+# @st.cache_data: 데이터를 매번 새로 불러오지 않고 메모리에 저장하여 앱 속도를 높입니다.
+@st.cache_data
+def load_data():
+    url = "https://raw.githubusercontent.com/keep-growing-park/data-science/refs/heads/main/dataset/kobis_1year_boxoffice.csv"
+    
+    # 1. CSV 데이터 불러오기
+    df = pd.read_csv(url)
+    
+    # 2. 결측치(빈 값)가 포함된 행 삭제
+    df = df.dropna()
+    
+    # 3. '기준일자' 컬럼을 날짜(datetime) 형식으로 변환
+    df["기준일자"] = pd.to_datetime(df["기준일자"])
+    
+    # 4. 숫자형 컬럼 데이터 타입 정리 (혹시 문자열로 들어올 경우를 대비)
+    if "해당일관객수" in df.columns:
+        df["해당일관객수"] = pd.to_numeric(df["해당일관객수"], errors="coerce")
+    if "누적관객수" in df.columns:
+        df["누적관객수"] = pd.to_numeric(df["누적관객수"], errors="coerce")
+    
+    # 5. 전체 데이터를 기준일자 순서대로 정렬
+    df = df.sort_values("기준일자")
+    
+    return df
 
-# 시각화를 위해 영화명을 인덱스로 세팅합니다.
-chart_data = top_5_df.set_index("movieNm")[["audiCnt"]]
-chart_data.columns = ["관객수"]
-st.bar_chart(chart_data)
+# 데이터 로딩 실행
+data = load_data()
 
-st.markdown("---")
-
-# [표] 전체 순위 상세 정보
-st.subheader("📋 전체 박스오피스 목록")
-
-# 필요한 컬럼만 추출
-display_df = df[["rank", "movieNm", "openDt", "audiCnt", "audiAcc", "scrnCnt"]].copy()
-display_df.columns = ["순위", "영화명", "개봉일", "관객수", "누적관객", "스크린수"]
-
-# 숫자에 천 단위 쉼표(,) 포맷팅을 적용해 표로 출력
-st.dataframe(
-    display_df,
-    column_config={
-        "순위": st.column_config.NumberColumn("순위", format="%d"),
-        "관객수": st.column_config.NumberColumn("관객수", format="%d명"),
-        "누적관객": st.column_config.NumberColumn("누적관객", format="%d명"),
-        "스크린수": st.column_config.NumberColumn("스크린수", format="%d개"),
-    },
-    use_container_width=True,
-    hide_index=True
+# -----------------------------------------------------------------------------
+# 3. 영화 선택 목록 생성 (누적관객수 내림차순 정렬)
+# -----------------------------------------------------------------------------
+# 각 영화의 최대 누적관객수를 구해 많은 순서(내림차순)대로 영화 이름 목록을 정렬합니다.
+movie_order = (
+    data.groupby("영화명")["누적관객수"]
+    .max()
+    .sort_values(ascending=False)
+    .index.tolist()
 )
+
+# -----------------------------------------------------------------------------
+# 4. 사이드바: 분석 옵션 선택
+# -----------------------------------------------------------------------------
+st.sidebar.header("🔍 조회 조건")
+selected_movie = st.sidebar.selectbox(
+    "영화 선택 (누적관객수 순)",
+    options=movie_order,
+    index=0
+)
+
+# 선택한 영화의 데이터만 추출
+filtered_df = data[data["영화명"] == selected_movie]
+
+# -----------------------------------------------------------------------------
+# 5. 메인 화면 - 구역 1: 영화별 관객수 변화 추이 (선 그래프)
+# -----------------------------------------------------------------------------
+st.header(f"📈 1. '{selected_movie}' 일별 관객수 추이")
+
+# 사용자가 선택한 영화 데이터가 있는 경우 그래프를 그립니다.
+if not filtered_df.empty:
+    # Plotly를 이용한 선 그래프 생성
+    fig = px.line(
+        filtered_df,
+        x="기준일자",
+        y="해당일관객수",
+        title=f"일자별 해당일 관객수 변화",
+        labels={"기준일자": "날짜", "해당일관객수": "일별 관객수 (명)"},
+        markers=True,  # 각 데이터 지점에 점 표시
+        hover_data={"기준일자": "|%Y-%m-%d", "해당일관객수": ":,d"}  # 툴팁 숫자 포맷팅
+    )
+    
+    # 그래프 스타일 조정
+    fig.update_layout(
+        xaxis_title="기준일자",
+        yaxis_title="해당일 관객수 (명)",
+        hovermode="x unified"
+    )
+    
+    # Streamlit 화면에 그래프 출력
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # [그래프 설명 문구 자리]
+    st.info(
+        f"💡 **이 그래프로 알 수 있는 것:** "
+        f"'{selected_movie}'의 개봉 이후 날짜별 일일 관객수 증감 추세와 최고 관객수를 기록한 시점을 파악할 수 있습니다."
+    )
+else:
+    st.warning("선택한 영화의 데이터가 존재하지 않습니다.")
+
+st.markdown("---")
+
+# -----------------------------------------------------------------------------
+# 6. 메인 화면 - 구역 2: 향후 추가 그래프 구역 (확장용)
+# -----------------------------------------------------------------------------
+st.header("📊 2. 추가 분석 (추가 예정 구역)")
+st.caption("이 구역에는 추후 다른 형태의 시각화 그래프나 종합 분석 표가 추가될 예정입니다.")
+
+# 예시용 컨테이너/자리 확보
+with st.container():
+    st.write("*(새로운 그래프를 여기에 추가하세요)*")
+    
+    # [추후 그래프 설명 문구 자리]
+    st.info("💡 **이 그래프로 알 수 있는 것:** (추가 예정 그래프에 대한 설명이 들어갈 자리입니다.)")
