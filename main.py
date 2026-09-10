@@ -273,10 +273,8 @@ st.markdown("---")
 st.header("📊 5. 월별 전체 관객수 합계")
 
 if not daily_sum_df.empty:
-    # 1) 기준일자를 'YYYY-MM' 형식의 문자열 컬럼으로 생성
     daily_sum_df["연월"] = daily_sum_df["기준일자"].dt.strftime("%Y-%m")
 
-    # 2) 월(연월) 단위로 재그룹화하여 해당일관객수 총합 계산
     monthly_sum_df = (
         daily_sum_df.groupby("연월")["해당일관객수"]
         .sum()
@@ -284,21 +282,20 @@ if not daily_sum_df.empty:
         .sort_values("연월")
     )
 
-    # 3) Plotly 막대그래프 생성
     fig5 = px.bar(
         monthly_sum_df,
         x="연월",
         y="해당일관객수",
         title="월별 박스오피스 전체 관객수 합계",
         labels={"연월": "조회 월", "해당일관객수": "월별 총 관객수 (명)"},
-        text_auto=",.0f",  # 막대 상단에 천 단위 쉼표가 들어간 숫자 수치 표시
+        text_auto=",.0f",
         hover_data={"연월": True, "해당일관객수": ":,d"}
     )
 
     fig5.update_layout(
         xaxis_title="월 (YYYY-MM)",
         yaxis_title="월별 총 관객수 (명)",
-        xaxis=dict(type="category")  # 범주형 축 지정으로 연월 표시 간격을 균일하게 유지
+        xaxis=dict(type="category")
     )
 
     st.plotly_chart(fig5, use_container_width=True)
@@ -307,6 +304,65 @@ if not daily_sum_df.empty:
         "💡 **이 그래프로 알 수 있는 것:** "
         "월 단위 총 관객수 규모를 직관적으로 비교하여 여름/겨울 방학 및 연말연시 등의 영화 시장 성수기와 "
         "비수기 간의 전체 관객 유입량 차이를 명확히 파악할 수 있습니다."
+    )
+else:
+    st.warning("분석할 박스오피스 데이터가 존재하지 않습니다.")
+
+st.markdown("---")
+
+# -----------------------------------------------------------------------------
+# 10. 메인 화면 - 구역 6: 캘린더 히트맵 (주차 x 요일별 일관객수)
+# -----------------------------------------------------------------------------
+st.header("🗓️ 6. 일별 관객수 캘린더 히트맵")
+
+if not daily_sum_df.empty:
+    heatmap_df = daily_sum_df.copy()
+
+    # 1) 요일 이름 및 순서 정의 (월요일 ~ 일요일)
+    days_kr = ["월", "화", "수", "목", "금", "토", "일"]
+    heatmap_df["요일_num"] = heatmap_df["기준일자"].dt.dayofweek
+    heatmap_df["요일"] = heatmap_df["요일_num"].apply(lambda x: days_kr[x])
+
+    # 2) 주차(연-주차) 컬럼 및 날짜 문자열(YYYY-MM-DD) 컬럼 생성
+    heatmap_df["연주차"] = heatmap_df["기준일자"].dt.strftime("%Y-W%W")
+    heatmap_df["날짜_str"] = heatmap_df["기준일자"].dt.strftime("%Y-%m-%d")
+
+    # 3) 피벗 테이블 생성 (x: 연주차, y: 요일, z: 관객수 / customdata: YYYY-MM-DD)
+    pivot_val = heatmap_df.pivot(index="요일", columns="연주차", values="해당일관객수")
+    pivot_date = heatmap_df.pivot(index="요일", columns="연주차", values="날짜_str")
+
+    # 4) 화면상 y축 맨 위에 '월요일', 맨 아래에 '일요일'이 오도록 인덱스 순서 재정렬
+    # (Plotly Heatmap은 y축 첫 번째 요소를 맨 아래에 그리므로 역순 배치)
+    pivot_val = pivot_val.reindex(reversed(days_kr))
+    pivot_date = pivot_date.reindex(reversed(days_kr))
+
+    # 5) Plotly 히트맵 생성
+    fig6 = go.Figure(
+        data=go.Heatmap(
+            z=pivot_val.values,
+            x=pivot_val.columns,
+            y=pivot_val.index,
+            customdata=pivot_date.values,
+            colorscale="YlOrRd",  # 관객수가 많을수록 붉고 진하게 표시
+            hovertemplate="<b>날짜: %{customdata}</b><br>요일: %{y}요일<br>관객수: %{z:,}명<extra></extra>",
+            xgap=2,
+            ygap=2
+        )
+    )
+
+    fig6.update_layout(
+        title="주차 및 요일별 박스오피스 일관객수 캘린더 히트맵",
+        xaxis_title="연도-주차",
+        yaxis_title="요일",
+        xaxis=dict(type="category")
+    )
+
+    st.plotly_chart(fig6, use_container_width=True)
+
+    st.info(
+        "💡 **이 그래프로 알 수 있는 것:** "
+        "주차별·요일별 관객수 분포를 캘린더 형태로 확인하여, 연중 어떤 주차의 주말/평일에 관객 집중도가 극대화되었는지 "
+        "시각적으로 한눈에 비교할 수 있습니다."
     )
 else:
     st.warning("분석할 박스오피스 데이터가 존재하지 않습니다.")
