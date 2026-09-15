@@ -497,12 +497,10 @@ fig3.update_layout(
 
 st.plotly_chart(fig3, use_container_width=True)
 
-# 주요 통계값 자동 계산
 max_row = df.loc[df["total_audi"].idxmax()]
 max_movie_name = max_row["movieNm"]
 max_movie_audi = int(max_row["total_audi"])
 
-# 100만 명 이하 영화 편수 및 비율 계산
 under_1m_cnt = (df["total_audi"] < 1000000).sum()
 total_cnt = len(df)
 under_1m_pct = (under_1m_cnt / total_cnt) * 100
@@ -511,4 +509,47 @@ st.info(
     f"💡 **이 그래프로 알 수 있는 것:** "
     f"전체 {total_cnt}편 중 대다수인 {under_1m_cnt}편(약 {under_1m_pct:.1f}%)이 **관객수 100만 명 미만 구간**에 집중되어 있어 극심한 흥행 쏠림 현상을 보여줍니다. "
     f"가장 많은 관객을 모은 최고 흥행작은 **'{max_movie_name}'**(총 {max_movie_audi:,}명)입니다."
+)
+
+st.markdown("---")
+
+# -----------------------------------------------------------------------------
+# 6. 구역 4: 개봉일 스크린수와 총 관객수의 관계 (산점도)
+# -----------------------------------------------------------------------------
+st.header("🎯 4. 개봉일 스크린수 vs 총 관객수 산점도")
+
+fig4 = px.scatter(
+    df,
+    x="first_scrn",
+    y="total_audi",
+    color="genre",
+    hover_name="movieNm",
+    title="개봉일 스크린수와 총 관객수 간의 관계",
+    labels={
+        "first_scrn": "개봉일 스크린수 (개)",
+        "total_audi": "총 관객수 (명)",
+        "genre": "장르",
+        "movieNm": "영화명"
+    },
+    hover_data={
+        "first_scrn": ":,d",
+        "total_audi": ":,d",
+        "genre": True
+    }
+)
+
+fig4.update_traces(marker=dict(size=9, opacity=0.8))
+
+fig4.update_layout(
+    xaxis_title="개봉일 스크린수 (개)",
+    yaxis_title="총 관객수 (명)",
+    legend_title_text="장르"
+)
+
+st.plotly_chart(fig4, use_container_width=True)
+
+st.info(
+    "💡 **이 그래프로 알 수 있는 것:** "
+    "개봉일 확보한 스크린수가 많을수록 최종 총 관객수도 함께 증가하는 전반적인 양의 상관관계를 볼 수 있으며, "
+    "스크린 수 대비 상대적으로 높은 흥행 실적을 거둔 이례적 성과 영화나 그 반대의 사례를 장르별로 쉽게 식별할 수 있습니다."
 )
