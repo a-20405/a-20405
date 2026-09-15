@@ -386,7 +386,6 @@ st.markdown("---")
 # -----------------------------------------------------------------------------
 # 2. 데이터 불러오기 및 전처리 (캐싱 적용)
 # -----------------------------------------------------------------------------
-# @st.cache_data: 데이터 수집 및 전처리 결과를 메모리에 저장해 새로고침 시 앱 속도를 높입니다.
 @st.cache_data
 def load_movie_data():
     url = "https://raw.githubusercontent.com/greatsong/modudata/main/data/kobis_movies.csv"
@@ -397,11 +396,11 @@ def load_movie_data():
         lambda x: x.split("|")[0].strip() if pd.notna(x) and x != "nan" else "기타"
     )
     
-    # [숫자 데이터 정리] 주요 수치 컬럼들을 정수/실수형으로 변환
+    # [숫자 데이터 정리] 주요 수치 컬럼들을 정수형으로 변환
     numeric_cols = ["first_scrn", "first_show", "first_week_audi", "total_audi", "days_in_top10"]
     for col in numeric_cols:
         if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
             
     return df
 
@@ -413,20 +412,17 @@ df = load_movie_data()
 # -----------------------------------------------------------------------------
 st.header("🍩 1. 장르별 영화 편수 분포")
 
-# 장르별 영화 편수 집계
 genre_counts = df["genre"].value_counts().reset_index()
 genre_counts.columns = ["장르", "영화편수"]
 
-# Plotly 도넛 그래프(Pie chart with hole) 생성
 fig1 = px.pie(
     genre_counts,
     names="장르",
     values="영화편수",
     title="장르별 영화 수 및 비율 분포",
-    hole=0.4  # 중앙에 구멍을 내어 도넛 형태로 만듭니다.
+    hole=0.4
 )
 
-# 조각에 마우스를 올려놓았을 때 편수와 비율이 보이도록 툴팁 및 표시 설정
 fig1.update_traces(
     textinfo="percent+label",
     hovertemplate="<b>장르: %{label}</b><br>영화 편수: %{value}편<br>비율: %{percent}<extra></extra>"
@@ -436,11 +432,41 @@ fig1.update_layout(
     legend_title_text="영화 장르"
 )
 
-# Streamlit 화면에 그래프 출력
 st.plotly_chart(fig1, use_container_width=True)
 
-# [그래프 설명 문구 자리]
 st.info(
     "💡 **이 그래프로 알 수 있는 것:** "
     "최근 1년간 박스오피스 상위권에 진입한 영화 중 어떤 장르가 가장 큰 비중을 차지하는지 장르별 편수와 제작 비율을 한눈에 파악할 수 있습니다."
+)
+
+st.markdown("---")
+
+# -----------------------------------------------------------------------------
+# 4. 구역 2: 장르 및 영화별 총 관객수 분포 (트리맵)
+# -----------------------------------------------------------------------------
+st.header("🗺️ 2. 장르 및 영화별 총 관객수 트리맵")
+
+# Plotly 트리맵 생성 (장르 -> 영화명 계층 구조)
+fig2 = px.treemap(
+    df,
+    path=[px.Constant("전체 영화"), "genre", "movieNm"],  # 계층 구조 설정: 전체 -> 장르 -> 영화명
+    values="total_audi",                                 # 칸의 크기: 총 관객수
+    color="genre",                                      # 장르별 색상 구분
+    title="장르 및 영화별 총 관객수 비중 (칸 크기 = 총 관객수)"
+)
+
+# 마우스를 올렸을 때 영화명과 총 관객수가 표시되도록 툴팁 설정
+fig2.update_traces(
+    hovertemplate="<b>%{label}</b><br>총 관객수: %{value:,}명<extra></extra>"
+)
+
+fig2.update_layout(
+    margin=dict(t=50, l=25, r=25, b=25)
+)
+
+st.plotly_chart(fig2, use_container_width=True)
+
+st.info(
+    "💡 **이 그래프로 알 수 있는 것:** "
+    "전체 영화 시장에서 각 장르가 차지하는 관객 규모 비중과 함께, 장르 내에서 어떤 영화가 흥행을 주도했는지 상대적인 관객수 크기를 한눈에 비교할 수 있습니다."
 )
