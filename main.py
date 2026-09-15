@@ -366,3 +366,81 @@ if not daily_sum_df.empty:
     )
 else:
     st.warning("분석할 박스오피스 데이터가 존재하지 않습니다.")
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+
+# -----------------------------------------------------------------------------
+# 1. 페이지 기본 설정
+# -----------------------------------------------------------------------------
+st.set_page_config(
+    page_title="영화 데이터 그래프 도감 2 - 분포와 관계",
+    page_icon="🎬",
+    layout="wide"
+)
+
+st.title("🎬 영화 데이터 그래프 도감 2 - 분포와 관계")
+st.markdown("1년간 박스오피스 10위권에 든 216편 영화의 다양한 지표 분포와 관계를 탐색합니다.")
+st.markdown("---")
+
+# -----------------------------------------------------------------------------
+# 2. 데이터 불러오기 및 전처리 (캐싱 적용)
+# -----------------------------------------------------------------------------
+# @st.cache_data: 데이터 수집 및 전처리 결과를 메모리에 저장해 새로고침 시 앱 속도를 높입니다.
+@st.cache_data
+def load_movie_data():
+    url = "https://raw.githubusercontent.com/greatsong/modudata/main/data/kobis_movies.csv"
+    df = pd.read_csv(url)
+    
+    # [장르 전처리] 세로막대 기호('|')로 여러 장르가 기재된 경우 첫 번째 장르만 추출
+    df["genre"] = df["genre"].astype(str).apply(
+        lambda x: x.split("|")[0].strip() if pd.notna(x) and x != "nan" else "기타"
+    )
+    
+    # [숫자 데이터 정리] 주요 수치 컬럼들을 정수/실수형으로 변환
+    numeric_cols = ["first_scrn", "first_show", "first_week_audi", "total_audi", "days_in_top10"]
+    for col in numeric_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+            
+    return df
+
+# 데이터 로딩 실행
+df = load_movie_data()
+
+# -----------------------------------------------------------------------------
+# 3. 구역 1: 장르별 영화 편수 분포 (도넛 그래프)
+# -----------------------------------------------------------------------------
+st.header("🍩 1. 장르별 영화 편수 분포")
+
+# 장르별 영화 편수 집계
+genre_counts = df["genre"].value_counts().reset_index()
+genre_counts.columns = ["장르", "영화편수"]
+
+# Plotly 도넛 그래프(Pie chart with hole) 생성
+fig1 = px.pie(
+    genre_counts,
+    names="장르",
+    values="영화편수",
+    title="장르별 영화 수 및 비율 분포",
+    hole=0.4  # 중앙에 구멍을 내어 도넛 형태로 만듭니다.
+)
+
+# 조각에 마우스를 올려놓았을 때 편수와 비율이 보이도록 툴팁 및 표시 설정
+fig1.update_traces(
+    textinfo="percent+label",
+    hovertemplate="<b>장르: %{label}</b><br>영화 편수: %{value}편<br>비율: %{percent}<extra></extra>"
+)
+
+fig1.update_layout(
+    legend_title_text="영화 장르"
+)
+
+# Streamlit 화면에 그래프 출력
+st.plotly_chart(fig1, use_container_width=True)
+
+# [그래프 설명 문구 자리]
+st.info(
+    "💡 **이 그래프로 알 수 있는 것:** "
+    "최근 1년간 박스오피스 상위권에 진입한 영화 중 어떤 장르가 가장 큰 비중을 차지하는지 장르별 편수와 제작 비율을 한눈에 파악할 수 있습니다."
+)
