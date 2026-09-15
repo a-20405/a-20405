@@ -446,16 +446,14 @@ st.markdown("---")
 # -----------------------------------------------------------------------------
 st.header("🗺️ 2. 장르 및 영화별 총 관객수 트리맵")
 
-# Plotly 트리맵 생성 (장르 -> 영화명 계층 구조)
 fig2 = px.treemap(
     df,
-    path=[px.Constant("전체 영화"), "genre", "movieNm"],  # 계층 구조 설정: 전체 -> 장르 -> 영화명
-    values="total_audi",                                 # 칸의 크기: 총 관객수
-    color="genre",                                      # 장르별 색상 구분
+    path=[px.Constant("전체 영화"), "genre", "movieNm"],
+    values="total_audi",
+    color="genre",
     title="장르 및 영화별 총 관객수 비중 (칸 크기 = 총 관객수)"
 )
 
-# 마우스를 올렸을 때 영화명과 총 관객수가 표시되도록 툴팁 설정
 fig2.update_traces(
     hovertemplate="<b>%{label}</b><br>총 관객수: %{value:,}명<extra></extra>"
 )
@@ -469,4 +467,48 @@ st.plotly_chart(fig2, use_container_width=True)
 st.info(
     "💡 **이 그래프로 알 수 있는 것:** "
     "전체 영화 시장에서 각 장르가 차지하는 관객 규모 비중과 함께, 장르 내에서 어떤 영화가 흥행을 주도했는지 상대적인 관객수 크기를 한눈에 비교할 수 있습니다."
+)
+
+st.markdown("---")
+
+# -----------------------------------------------------------------------------
+# 5. 구역 3: 총 관객수 분포 (히스토그램)
+# -----------------------------------------------------------------------------
+st.header("📊 3. 총 관객수 히스토그램")
+
+fig3 = px.histogram(
+    df,
+    x="total_audi",
+    nbins=30,
+    title="영화별 총 관객수 구간 분포",
+    labels={"total_audi": "총 관객수 (명)"},
+    color_discrete_sequence=["#636EFA"]
+)
+
+fig3.update_traces(
+    hovertemplate="총 관객수 구간: %{x:,}명<br>영화 수: %{y}편<extra></extra>"
+)
+
+fig3.update_layout(
+    xaxis_title="총 관객수 (명)",
+    yaxis_title="영화 수 (편)",
+    bargap=0.1
+)
+
+st.plotly_chart(fig3, use_container_width=True)
+
+# 주요 통계값 자동 계산
+max_row = df.loc[df["total_audi"].idxmax()]
+max_movie_name = max_row["movieNm"]
+max_movie_audi = int(max_row["total_audi"])
+
+# 100만 명 이하 영화 편수 및 비율 계산
+under_1m_cnt = (df["total_audi"] < 1000000).sum()
+total_cnt = len(df)
+under_1m_pct = (under_1m_cnt / total_cnt) * 100
+
+st.info(
+    f"💡 **이 그래프로 알 수 있는 것:** "
+    f"전체 {total_cnt}편 중 대다수인 {under_1m_cnt}편(약 {under_1m_pct:.1f}%)이 **관객수 100만 명 미만 구간**에 집중되어 있어 극심한 흥행 쏠림 현상을 보여줍니다. "
+    f"가장 많은 관객을 모은 최고 흥행작은 **'{max_movie_name}'**(총 {max_movie_audi:,}명)입니다."
 )
