@@ -553,3 +553,49 @@ st.info(
     "개봉일 확보한 스크린수가 많을수록 최종 총 관객수도 함께 증가하는 전반적인 양의 상관관계를 볼 수 있으며, "
     "스크린 수 대비 상대적으로 높은 흥행 실적을 거둔 이례적 성과 영화나 그 반대의 사례를 장르별로 쉽게 식별할 수 있습니다."
 )
+
+st.markdown("---")
+
+# -----------------------------------------------------------------------------
+# 7. 구역 5: 영화 10편 이상 장르별 총 관객수 분포 (박스플롯)
+# -----------------------------------------------------------------------------
+st.header("📦 5. 주요 장르별 총 관객수 박스플롯")
+
+# 1) 영화 편수가 10편 이상인 장르 필터링
+genre_counts_series = df["genre"].value_counts()
+valid_genres = genre_counts_series[genre_counts_series >= 10].index
+box_df = df[df["genre"].isin(valid_genres)]
+
+# 2) 박스플롯 생성 (outliers 지점에 마우스 오버 시 영화명 표시)
+fig5 = px.box(
+    box_df,
+    x="genre",
+    y="total_audi",
+    color="genre",
+    hover_name="movieNm",
+    points="outliers",
+    title="영화 10편 이상 장르별 총 관객수 분포 및 이상치 비교",
+    labels={
+        "genre": "장르",
+        "total_audi": "총 관객수 (명)",
+        "movieNm": "영화명"
+    },
+    hover_data={
+        "total_audi": ":,d",
+        "genre": False
+    }
+)
+
+fig5.update_layout(
+    xaxis_title="장르 (10편 이상 등재)",
+    yaxis_title="총 관객수 (명)",
+    showlegend=False
+)
+
+st.plotly_chart(fig5, use_container_width=True)
+
+st.info(
+    "💡 **이 그래프로 알 수 있는 것:** "
+    "영화 제작 편수가 10편 이상인 주요 장르 간 관객수 중앙값과 스펙트럼 범위를 비교할 수 있으며, "
+    "장르별 일반적인 범위를 뛰어넘어 압도적 흥행 대박을 터뜨린 점(이상치)의 영화가 무엇인지 명확하게 파악할 수 있습니다."
+)
